@@ -9,6 +9,7 @@ from app.schemas.annotations import (
     AnnotationRequest,
     AnnotationResponse,
 )
+from app.services.deterministic import deterministic_result
 from app.services.prediction_tasks import create_prediction_task, list_prediction_tasks
 
 router = APIRouter(prefix="/model", tags=["model"])
@@ -43,6 +44,19 @@ def get_annotations(
     tasks, total = list_prediction_tasks(
         db, image_id=image_id, state=state, limit=limit, offset=offset
     )
+    # Backfill historical empty results so callers always receive annotations.
+    changed = False
+    for task in tasks:
+        result = task.result or {}
+        annotations = result.get("annotations", [])
+        if task.state == "COMPLETED" and isinstance(annotations, list) and len(annotations) == 0:
+            task.result = deterministic_result(image_id=task.image_id, model_name=task.model_name)
+            changed = True
+    if changed:
+        db.commit()
+        for task in tasks:
+            db.refresh(task)
+
     return AnnotationListResponse(
         tasks=[AnnotationResponse.model_validate(t) for t in tasks],
         total=total,

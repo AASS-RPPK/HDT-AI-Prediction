@@ -6,6 +6,7 @@ from typing import Any
 from app.core.celery_app import celery_app
 from app.db.models import PredictionState
 from app.db.session import SessionLocal
+from app.services.deterministic import deterministic_result
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +31,9 @@ def run_prediction(
         task.state = PredictionState.PROCESSING.value
         db.commit()
 
-        # ------------------------------------------------------------------
-        # TODO: Replace the placeholder below with actual model inference.
-        #
-        # Example integration:
-        #   from app.services.model_runner import predict
-        #   annotations = predict(image_id, model_name, parameters)
-        #
-        # The result should be a dict with an "annotations" key containing
-        # the list of predicted annotation objects.
-        # ------------------------------------------------------------------
-        annotations: dict[str, Any] = {
-            "annotations": [],
-            "model_name": model_name,
-            "image_id": image_id,
-        }
+        # Deterministic mock inference for integration testing and demos.
+        # For the same image_id + model_name, generated annotations are identical.
+        annotations: dict[str, Any] = deterministic_result(image_id=image_id, model_name=model_name)
 
         task.state = PredictionState.COMPLETED.value
         task.result = annotations
